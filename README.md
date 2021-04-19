@@ -1,3 +1,6 @@
+
+## IMPLEMENTATION OF https://github.com/experiencor/keras-yolo3, SHOULD MAYBE HAVE BEEN A FORK
+
 # YOLO3 (Detection, Training, and Evaluation)
 
 ## Dataset and Model
