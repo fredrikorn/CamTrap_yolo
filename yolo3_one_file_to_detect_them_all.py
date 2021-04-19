@@ -4,9 +4,10 @@ import numpy as np
 from keras.layers import Conv2D, Input, BatchNormalization, LeakyReLU, ZeroPadding2D, UpSampling2D
 from keras.layers.merge import add, concatenate
 from keras.models import Model
+import tensorflow as tf
 import struct
 import cv2
-
+'''
 np.set_printoptions(threshold=np.nan)
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
@@ -23,6 +24,14 @@ argparser.add_argument(
     '-i',
     '--image',
     help='path to image file')
+'''
+config = tf.compat.v1.ConfigProto(
+    gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.9)
+    # device_count = {'GPU': 1}
+)
+config.gpu_options.allow_growth = True
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 class WeightReader:
     def __init__(self, weight_file):
@@ -272,7 +281,7 @@ def preprocess_input(image, net_h, net_w):
 
     # embed the image into the standard letter box
     new_image = np.ones((net_h, net_w, 3)) * 0.5
-    new_image[int((net_h-new_h)//2):int((net_h+new_h)//2), int((net_w-new_w)//2):int((net_w+new_w)//2), :] = resized
+    new_image[round((net_h-new_h)/2):round((net_h+new_h)/2), round((net_w-new_w)/2):round((net_w+new_w)/2), :] = resized
     new_image = np.expand_dims(new_image, 0)
 
     return new_image
@@ -430,5 +439,9 @@ def _main_(args):
     cv2.imwrite(image_path[:-4] + '_detected' + image_path[-4:], (image).astype('uint8')) 
 
 if __name__ == '__main__':
-    args = argparser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', type=str, default='yolov3.weights')
+    parser.add_argument('--image', type=str, default='dog.jpg' )
+
+    args = parser.parse_args()
     _main_(args)
