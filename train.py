@@ -60,7 +60,7 @@ def create_training_instances(
 
         # return None, None, None if some given label is not in the dataset
         if len(overlap_labels) < len(labels):
-            print('Some labels have no annotations! Please revise the list of labels in the config.json.')
+            print('Some labels have no annotations! Please revise the list of labels in the config.json.') # Här slår det slint
             return None, None, None
     else:
         print('No labels are provided. Train on all seen labels.')
@@ -106,6 +106,38 @@ def create_callbacks(saved_weights_name, tensorboard_logs, model_to_save):
         write_images           = True,
     )    
     return [early_stop, checkpoint, reduce_on_plateau, tensorboard]
+
+def no_tensorboard_callbacks(saved_weights_name, model_to_save):
+    makedirs(tensorboard_logs)
+    
+    early_stop = EarlyStopping(
+        monitor     = 'loss', 
+        min_delta   = 0.01, 
+        patience    = 7, 
+        mode        = 'min', 
+        verbose     = 1
+    )
+    checkpoint = CustomModelCheckpoint(
+        model_to_save   = model_to_save,
+        filepath        = saved_weights_name,# + '{epoch:02d}.h5', 
+        monitor         = 'loss', 
+        verbose         = 1, 
+        save_best_only  = True, 
+        mode            = 'min', 
+        period          = 1
+    )
+    reduce_on_plateau = ReduceLROnPlateau(
+        monitor  = 'loss',
+        factor   = 0.1,
+        patience = 2,
+        verbose  = 1,
+        mode     = 'min',
+        epsilon  = 0.01,
+        cooldown = 0,
+        min_lr   = 0
+    )
+    return [early_stop, checkpoint, reduce_on_plateau ]
+
 
 def create_model(
     nb_class, 
@@ -255,6 +287,7 @@ def _main_(args):
     #   Kick off the training
     ###############################
     callbacks = create_callbacks(config['train']['saved_weights_name'], config['train']['tensorboard_dir'], infer_model)
+    #callbacks = no_tensorboard_callbacks(config['train']['saved_weights_name'], infer_model)
 
     train_model.fit_generator(
         generator        = train_generator, 
@@ -263,7 +296,7 @@ def _main_(args):
         verbose          = 2 if config['train']['debug'] else 1,
         callbacks        = callbacks, 
         workers          = 4,
-        max_queue_size   = 8
+        max_queue_size   = 4
     )
 
     # make a GPU version of infer_model for evaluation
@@ -274,7 +307,7 @@ def _main_(args):
     #   Run the evaluation
     ###############################   
     # compute mAP for all the classes
-    average_precisions = evaluate(infer_model, valid_generator)
+    average_precisions = evaluate(train_model, valid_generator)
 
     # print the score
     for label, average_precision in average_precisions.items():

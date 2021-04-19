@@ -48,10 +48,12 @@ def bbox_iou(box1, box2):
     intersect_h = _interval_overlap([box1.ymin, box1.ymax], [box2.ymin, box2.ymax])  
     
     intersect = intersect_w * intersect_h
-
-    w1, h1 = box1.xmax-box1.xmin, box1.ymax-box1.ymin
-    w2, h2 = box2.xmax-box2.xmin, box2.ymax-box2.ymin
-    
+    if intersect == 0: 
+        return 0
+    w1 = box1.xmax-box1.xmin
+    h1 = box1.ymax-box1.ymin
+    w2 = box2.xmax-box2.xmin
+    h2 = box2.ymax-box2.ymin
     union = w1*h1 + w2*h2 - intersect
     
     return float(intersect) / union
