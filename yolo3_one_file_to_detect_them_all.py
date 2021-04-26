@@ -7,6 +7,7 @@ from keras.models import Model
 import tensorflow as tf
 import struct
 import cv2
+from keras.models import load_model
 '''
 np.set_printoptions(threshold=np.nan)
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
@@ -393,7 +394,11 @@ def _main_(args):
 
     # set some parameters
     net_h, net_w = 416, 416
-    obj_thresh, nms_thresh = 0.5, 0.45
+    obj_thresh, nms_thresh = 0.2, 0.3
+
+    anchors = [[26,55, 47,111, 52,228], [81,151, 91,221, 102,330], [139,252, 155,355, 352,388]]
+    labels = ["animal", "human"]
+    '''
     anchors = [[116,90,  156,198,  373,326],  [30,61, 62,45,  59,119], [10,13,  16,30,  33,23]]
     labels = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", \
               "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", \
@@ -405,7 +410,7 @@ def _main_(args):
               "chair", "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse", \
               "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", \
               "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
-
+    '''
     # make the yolov3 model to predict 80 classes on COCO
     yolov3 = make_yolov3_model()
 
@@ -418,8 +423,11 @@ def _main_(args):
     image_h, image_w, _ = image.shape
     new_image = preprocess_input(image, net_h, net_w)
 
+
+    infer_model = load_model("mega_1.h5")
     # run the prediction
-    yolos = yolov3.predict(new_image)
+    #yolos = yolov3.predict(new_image)
+    yolos = infer_model.predict(new_image)
     boxes = []
 
     for i in range(len(yolos)):
@@ -441,7 +449,7 @@ def _main_(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='yolov3.weights')
-    parser.add_argument('--image', type=str, default='dog.jpg' )
+    parser.add_argument('--image', type=str, default='bridgeguy.JPG' )
 
     args = parser.parse_args()
     _main_(args)

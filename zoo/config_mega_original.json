@@ -2,13 +2,13 @@
     "model" : {
         "min_input_size":       128,
         "max_input_size":       256,
-        "anchors":              [24,52, 35,125, 60,183, 69,98, 70,295, 102,201, 117,322, 182,345, 341,389],
+        "anchors":              [26,55, 47,111, 52,228, 81,151, 91,221, 102,330, 139,252, 155,355, 352,388],
         "labels":               ["animal", "human"]
     },
 
     "train": {
         "train_image_folder":   "train/images/",
-        "train_annot_folder":   "train/annotations_new/",
+        "train_annot_folder":   "train/annotations/",
         "cache_name":           "",
 
         "train_times":          1,
