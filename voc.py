@@ -47,15 +47,15 @@ def parse_voc_annotation(ann_dir, img_dir, cache_name, labels=[]):
                                 img['object'] += [obj]
                                 
                         if 'bndbox' in attr.tag:
-                            for dim in list(attr):
+                            for dim in list(attr):      # Added the max/min to make sure no bbox are outside the picture
                                 if 'xmin' in dim.tag:
-                                    obj['xmin'] = int(round(float(dim.text)))
+                                    obj['xmin'] = max(int(round(float(dim.text))), 0)
                                 if 'ymin' in dim.tag:
-                                    obj['ymin'] = int(round(float(dim.text)))
+                                    obj['ymin'] = max(int(round(float(dim.text))), 0)
                                 if 'xmax' in dim.tag:
-                                    obj['xmax'] = int(round(float(dim.text)))
+                                    obj['xmax'] = min(int(round(float(dim.text))), img['width'])
                                 if 'ymax' in dim.tag:
-                                    obj['ymax'] = int(round(float(dim.text)))
+                                    obj['ymax'] = min(int(round(float(dim.text))), img['height'])
 
             if len(img['object']) > 0:
                 all_insts += [img]
