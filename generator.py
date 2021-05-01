@@ -3,7 +3,9 @@ import copy
 import numpy as np
 from keras.utils import Sequence
 from utils.bbox import BoundBox, bbox_iou
-from utils.image import apply_random_scale_and_crop, random_distort_image, random_flip, correct_bounding_boxes
+from utils.image import apply_random_scale_and_crop, random_distort_image, random_flip, correct_bounding_boxes, augment_image
+from imgaug import augmenters as iaa
+
 
 class BatchGenerator(Sequence):
     def __init__(self, 
@@ -32,6 +34,30 @@ class BatchGenerator(Sequence):
         self.anchors            = [BoundBox(0, 0, anchors[2*i], anchors[2*i+1]) for i in range(len(anchors)//2)]
         self.net_h              = 416  
         self.net_w              = 416
+        self.train_aug          = iaa.SomeOf((1, 3), [  # Random number between 0, 3
+                                    # Random channel increase and rotation 0.03
+                                    iaa.Add((-5, 5)),  # Overall Brightness                   0.04
+                                    iaa.Multiply((0.95, 1.05), per_channel=0.2),  # Brightness multiplier per channel    0.05
+                                    iaa.Sharpen(alpha=(0.1, 0.75), lightness=(0.85, 1.15)),  # Sharpness                            0.05
+                                    iaa.WithColorspace(to_colorspace='HSV', from_colorspace='RGB',  # Random HSV increase                  0.09
+                                                        children=iaa.WithChannels(0, iaa.Add((-30, 30)))),
+                                    iaa.WithColorspace(to_colorspace='HSV', from_colorspace='RGB',
+                                                        children=iaa.WithChannels(1, iaa.Add((-30, 30)))),
+                                    iaa.WithColorspace(to_colorspace='HSV', from_colorspace='RGB',
+                                                        children=iaa.WithChannels(2, iaa.Add((-30, 30)))),
+                                    iaa.AddElementwise((-10, 10)),  # Per pixel addition                   0.11
+                                    iaa.CoarseDropout((0.0, 0.02), size_percent=(0.02, 0.25)),  # Add large black squares              0.13
+                                    iaa.GaussianBlur(sigma=(0.1, 1.0)),  # GaussianBlur                         0.14
+                                    iaa.Grayscale(alpha=(0.1, 1.0)),  # Random Grayscale conversion          0.17
+                                    iaa.Dropout(p=(0, 0.1), per_channel=0.2),  # Add small black squares              0.17
+                                    iaa.AdditiveGaussianNoise(scale=(0.0, 0.05 * 255), per_channel=0.5),
+                                    # Add Gaussian per pixel noise         0.26
+                                    iaa.ElasticTransformation(alpha=(0, 1.0), sigma=0.25),  # Distort image by rearranging pixels  0.70
+                                    iaa.LinearContrast((0.75, 1.5)),  # Contrast Normalization               0.95
+                                    iaa.weather.Clouds(),
+                                    iaa.weather.Fog(),
+                                    iaa.weather.Snowflakes()
+                                ], random_order=True)
 
         if shuffle: np.random.shuffle(self.instances)
             
@@ -102,9 +128,16 @@ class BatchGenerator(Sequence):
                 center_y = .5*(obj['ymin'] + obj['ymax'])
                 center_y = center_y / float(net_h) * grid_h # sigma(t_y) + c_y
                 
-                # determine the sizes of the bounding box
-                w = np.log((obj['xmax'] - obj['xmin']) / float(max_anchor.xmax)) # t_w
-                h = np.log((obj['ymax'] - obj['ymin']) / float(max_anchor.ymax)) # t_h
+                # determine the sizes of the bounding box #2021-05-01
+                    #Added chcek for boundary boxes with w or h = 0, causing log(0)=nan
+                if obj['xmax'] - obj['xmin'] > 0:
+                    w = np.log((obj['xmax'] - obj['xmin']) / float(max_anchor.xmax)) # t_w
+                else:
+                    w = -12.0
+                if obj['ymax'] - obj['ymin'] > 0:
+                    h = np.log((obj['ymax'] - obj['ymin']) / float(max_anchor.ymax)) # t_h
+                else:
+                    h= -12.0
 
                 box = [center_x, center_y, w, h]
 
@@ -148,13 +181,11 @@ class BatchGenerator(Sequence):
         return [x_batch, t_batch, yolo_1, yolo_2, yolo_3], [dummy_yolo_1, dummy_yolo_2, dummy_yolo_3]
 
     def _get_net_size(self, idx):
-        if idx%10 == 0:
+        if idx%100 == 0:
             net_size = self.downsample*np.random.randint(self.min_net_size/self.downsample, \
                                                          self.max_net_size/self.downsample+1)
             #print("resizing: ", net_size, net_size)
             self.net_h, self.net_w = net_size, net_size
-        if idx%1000 == 0:
-            print("Completed {} batches".format(idx))
 
         return self.net_h, self.net_w
     
@@ -183,12 +214,15 @@ class BatchGenerator(Sequence):
             
         dx = int(np.random.uniform(0, net_w - new_w))
         dy = int(np.random.uniform(0, net_h - new_h))
-        
+
         # apply scaling and cropping
         im_sized = apply_random_scale_and_crop(image, new_w, new_h, net_w, net_h, dx, dy)
         
         # randomly distort hsv space
-        im_sized = random_distort_image(im_sized)
+        #im_sized = random_distort_image(im_sized)
+        
+        #switched to imgaug for augmentations
+        image = self.train_aug.augment_image(image)
         
         # randomly flip
         flip = np.random.randint(2)
