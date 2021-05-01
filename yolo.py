@@ -5,6 +5,7 @@ from keras.engine.topology import Layer
 import tensorflow as tf
 
 debug = False
+printlosses = True
 
 class YoloLayer(Layer):
     def __init__(self, anchors, max_grid, batch_size, warmup_batches, ignore_thresh, 
@@ -176,16 +177,23 @@ class YoloLayer(Layer):
         loss_conf  = tf.reduce_sum(tf.square(conf_delta),     list(range(1,5)))
         loss_class = tf.reduce_sum(class_delta,               list(range(1,5)))
 
+        if printlosses:
+            loss_xy = tf.Print(loss_xy, [grid_h, tf.reduce_sum(loss_xy)], message='\n loss_xy \t\t', summarize=1000)
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(loss_wh)], message='\n loss_wh \t\t', summarize=1000)
+            loss_conf = tf.Print(loss_conf, [grid_h, tf.reduce_sum(loss_conf)], message='\n loss_conf \t\t', summarize=1000)
+            loss_class = tf.Print(loss_class, [grid_h, tf.reduce_sum(loss_class)], message='\n loss_class \t\t', summarize=1000)
+
         loss = loss_xy + loss_wh + loss_conf + loss_class
+        loss = tf.debugging.assert_all_finite(t=loss, msg="Non-finite loss")
 
         if debug:
-            loss = tf.Print(loss, [grid_h, avg_obj], message='avg_obj \t\t', summarize=1000)
-            loss = tf.Print(loss, [grid_h, avg_noobj], message='avg_noobj \t\t', summarize=1000)
-            loss = tf.Print(loss, [grid_h, avg_iou], message='avg_iou \t\t', summarize=1000)
-            loss = tf.Print(loss, [grid_h, avg_cat], message='avg_cat \t\t', summarize=1000)
-            loss = tf.Print(loss, [grid_h, recall50], message='recall50 \t', summarize=1000)
-            loss = tf.Print(loss, [grid_h, recall75], message='recall75 \t', summarize=1000)   
-            loss = tf.Print(loss, [grid_h, count], message='count \t', summarize=1000)     
+            loss = tf.Print(loss, [grid_h, avg_obj], message='\n avg_obj \t\t', summarize=1000)
+            loss = tf.Print(loss, [grid_h, avg_noobj], message='\n avg_noobj \t\t', summarize=1000)
+            loss = tf.Print(loss, [grid_h, avg_iou], message='\n avg_iou \t\t', summarize=1000)
+            loss = tf.Print(loss, [grid_h, avg_cat], message='\n avg_cat \t\t', summarize=1000)
+            loss = tf.Print(loss, [grid_h, recall50], message='\n recall50 \t', summarize=1000)
+            loss = tf.Print(loss, [grid_h, recall75], message='\n recall75 \t', summarize=1000)   
+            loss = tf.Print(loss, [grid_h, count], message='\n count \t', summarize=1000)     
             loss = tf.Print(loss, [grid_h, tf.reduce_sum(loss_xy), 
                                         tf.reduce_sum(loss_wh), 
                                         tf.reduce_sum(loss_conf), 
@@ -364,4 +372,7 @@ def create_yolov3_model(
     return [train_model, infer_model]
 
 def dummy_loss(y_true, y_pred):
-    return tf.sqrt(tf.reduce_sum(y_pred))
+    sum = tf.sqrt(tf.reduce_sum(y_pred))
+    tf.debugging.assert_all_finite(t=sum, msg="Non-finite loss")
+    return sum
+    
