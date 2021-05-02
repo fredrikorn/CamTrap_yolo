@@ -178,10 +178,15 @@ class YoloLayer(Layer):
         loss_class = tf.reduce_sum(class_delta,               list(range(1,5)))
 
         if printlosses:
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(count)], message='\n sum count\t\t', summarize=1000)
             loss_xy = tf.Print(loss_xy, [grid_h, tf.reduce_sum(loss_xy)], message='\n loss_xy \t\t', summarize=1000)
             loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(loss_wh)], message='\n loss_wh \t\t', summarize=1000)
             loss_conf = tf.Print(loss_conf, [grid_h, tf.reduce_sum(loss_conf)], message='\n loss_conf \t\t', summarize=1000)
             loss_class = tf.Print(loss_class, [grid_h, tf.reduce_sum(loss_class)], message='\n loss_class \t\t', summarize=1000)
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(pred_box_wh)], message='\n sum pred box wh\t\t', summarize=1000)
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(true_box_wh)], message='\n sum true box wh\t\t', summarize=1000)
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(pred_wh)], message='\n sum pred wh\t\t', summarize=1000)
+            loss_wh = tf.Print(loss_wh, [grid_h, tf.reduce_sum(true_wh)], message='\n sum true wh\t\t', summarize=1000)
 
         loss = loss_xy + loss_wh + loss_conf + loss_class
         loss = tf.debugging.assert_all_finite(t=loss, msg="Non-finite loss")
@@ -265,7 +270,7 @@ def create_yolov3_model(
     x = _conv_block(x, [{'filter': 256, 'kernel': 3, 'stride': 2, 'bnorm': True, 'leaky': True, 'layer_idx': 12},
                         {'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 13},
                         {'filter': 256, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 14}])
-
+                        
     # Layer 16 => 36
     for i in range(7):
         x = _conv_block(x, [{'filter': 128, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 16+i*3},
@@ -282,7 +287,7 @@ def create_yolov3_model(
     for i in range(7):
         x = _conv_block(x, [{'filter': 256, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 41+i*3},
                             {'filter': 512, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 42+i*3}])
-        
+
     skip_61 = x
         
     # Layer 62 => 65
@@ -301,7 +306,7 @@ def create_yolov3_model(
                         {'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 77},
                         {'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 78},
                         {'filter':  512, 'kernel': 1, 'stride': 1, 'bnorm': True, 'leaky': True, 'layer_idx': 79}], do_skip=False)
-
+                        
     # Layer 80 => 82
     pred_yolo_1 = _conv_block(x, [{'filter': 1024, 'kernel': 3, 'stride': 1, 'bnorm': True,  'leaky': True,  'layer_idx': 80},
                              {'filter': (3*(5+nb_class)), 'kernel': 1, 'stride': 1, 'bnorm': False, 'leaky': False, 'layer_idx': 81}], do_skip=False)
@@ -372,7 +377,9 @@ def create_yolov3_model(
     return [train_model, infer_model]
 
 def dummy_loss(y_true, y_pred):
-    sum = tf.sqrt(tf.reduce_sum(y_pred))
+    sum = tf.reduce_sum(y_pred)+1e-7    #Added to avoid exploding gradient
+    sum = tf.Print(sum, [sum], message='\n Dummy loss sum \t', summarize=1000)
+    sum = tf.sqrt(sum)
     tf.debugging.assert_all_finite(t=sum, msg="Non-finite loss")
     return sum
     

@@ -4,6 +4,8 @@ import argparse
 import os
 import numpy as np
 import json
+import multiprocessing
+from multiprocessing import pool
 from voc import parse_voc_annotation
 from yolo import create_yolov3_model, dummy_loss
 from generator import BatchGenerator
@@ -16,7 +18,7 @@ import tensorflow as tf
 import keras
 from keras.models import load_model
 
-
+'''
 config = tf.compat.v1.ConfigProto(
     gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.9)
     # device_count = {'GPU': 1}
@@ -24,7 +26,7 @@ config = tf.compat.v1.ConfigProto(
 config.gpu_options.allow_growth = True
 session = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(session)
-
+'''
 def create_training_instances(
     train_annot_folder,
     train_image_folder,
@@ -108,7 +110,6 @@ def create_callbacks(saved_weights_name, tensorboard_logs, model_to_save):
     return [early_stop, checkpoint, reduce_on_plateau, tensorboard]
 
 def no_tensorboard_callbacks(saved_weights_name, model_to_save):
-    makedirs(tensorboard_logs)
     
     early_stop = EarlyStopping(
         monitor     = 'loss', 
@@ -286,17 +287,17 @@ def _main_(args):
     ###############################
     #   Kick off the training
     ###############################
-    callbacks = create_callbacks(config['train']['saved_weights_name'], config['train']['tensorboard_dir'], infer_model)
-    #callbacks = no_tensorboard_callbacks(config['train']['saved_weights_name'], infer_model)
-
+    #callbacks = create_callbacks(config['train']['saved_weights_name'], config['train']['tensorboard_dir'], infer_model)
+    callbacks = no_tensorboard_callbacks(config['train']['saved_weights_name'], infer_model)
     train_model.fit_generator(
         generator        = train_generator, 
         steps_per_epoch  = len(train_generator) * config['train']['train_times'], 
         epochs           = config['train']['nb_epochs'] + config['train']['warmup_epochs'], 
         verbose          = 2 if config['train']['debug'] else 1,
         callbacks        = callbacks, 
-        workers          = 4,
-        max_queue_size   = 4
+       # use_multiprocessing=False,
+        #workers          = 1,
+       # max_queue_size   = 20
     )
 
     # make a GPU version of infer_model for evaluation
@@ -307,7 +308,7 @@ def _main_(args):
     #   Run the evaluation
     ###############################   
     # compute mAP for all the classes
-    average_precisions = evaluate(train_model, valid_generator)
+    average_precisions = evaluate(infer_model, valid_generator)
 
     # print the score
     for label, average_precision in average_precisions.items():
